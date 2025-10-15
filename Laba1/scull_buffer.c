@@ -45,6 +45,7 @@ static int scull_open(struct inode *inode, struct file *filp);
 static int scull_release(struct inode *inode, struct file *filp);
 static ssize_t scull_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos);
 static ssize_t scull_write(struct file *filp, const char __user *buf, size_t count, loff_t *f_pos);
+static long scull_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
 
 // Структура файловых операций - связывает системные вызовы с нашими функциями
 static struct file_operations scull_fops = {
@@ -53,6 +54,7 @@ static struct file_operations scull_fops = {
     .release = scull_release, // Вызывается при close() из пользовательского пространства
     .read = scull_read,      // Вызывается при read() из пользовательского пространства
     .write = scull_write,    // Вызывается при write() из пользовательского пространства
+    .unlocked_ioctl = scull_ioctl
 };
 
 // Функция открытия устройства
@@ -375,11 +377,35 @@ static void __exit scull_exit(void)
     pr_info("scull_buffer: Module unloaded\n");
 }
 
+// Добавим ioctl для Process C, чтобы получать состояние буфера
+static long scull_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+    struct scull_buffer *dev = filp->private_data; // Получаем наше устройство
+    int retval = 0;
+
+    if (mutex_lock_interruptible(&dev->lock))
+        return -ERESTARTSYS;
+
+    switch (cmd) {
+    case 0: // Команда для получения размера данных в буфере
+        if (copy_to_user((int __user *)arg, &dev->data_size, sizeof(dev->data_size))) {
+            retval = -EFAULT;
+        }
+        break;
+    // Можно добавить другие команды, например, для чтения всего содержимого без извлечения
+    default:
+        retval = -ENOTTY;
+    }
+
+    mutex_unlock(&dev->lock);
+    return retval;
+}
+
 // Указываем функции инициализации и очистки
 module_init(scull_init); // Функция scull_init будет вызвана при загрузке модуля
 module_exit(scull_exit); // Функция scull_exit будет вызвана при выгрузке модуля
 
 // Информация о модуле
-MODULE_LICENSE("GPL");              // Лицензия GPL
-MODULE_AUTHOR("Your Name");         // Ваше имя
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Илья Хомченков");
 MODULE_DESCRIPTION("Scull Driver with Circular Buffer and Locking"); // Описание
