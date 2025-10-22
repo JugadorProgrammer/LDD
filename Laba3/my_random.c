@@ -42,18 +42,16 @@ static int rand_open(struct inode *inode, struct file *filp);
 static int rand_release(struct inode *inode, struct file *filp);
 static long rand_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
 
-static ssize_t rand_write(struct file *filp, const char __user *buf, size_t count, loff_t *f_pos){return (ssize_t)0;}
-static ssize_t rand_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos){return (ssize_t)0;}
+static ssize_t rand_write(struct file *filp, const char __user *buf, size_t count, loff_t *f_pos){return -ENOSYS;}
+static ssize_t rand_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos){return -ENOSYS;}
 
 static long random_number(struct node *entropy)
 {
+    static long seed = 123;
     if(!entropy)
     {
-        return 0;
+        goto _exit;
     }
-
-    // число с предыдущих вычислений
-    static long seed = 0.0;
 
     struct node* next = entropy;
     while(!next)
@@ -62,8 +60,9 @@ static long random_number(struct node *entropy)
         next = next->next;
     }
 
+_exit:
     seed = seed * 1103515245 + 12345;
-    return (seed >> 16) & 0x7FFF;;
+    return (seed >> 16) & 0x7FFFFFFF;
 }
 
 // Структура файловых операций - связывает системные вызовы с нашими функциями
@@ -212,7 +211,6 @@ static long rand_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
         return -ERESTARTSYS;
     }
 
-    pr_info("rand: cmd = %d\n", cmd);
     switch (cmd) {
     case 0: // Команда для получения рандомного числа
     {

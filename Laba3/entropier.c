@@ -7,11 +7,15 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 
+void fill(struct timespec* source, struct timespec* destination) {
+    destination->tv_sec = source->tv_sec;
+    destination->tv_nsec = source->tv_nsec;
+}
+
 int main() {
     struct termios old, newSettings;
-    struct timespec first, second;
-    int flag = 1;
-    long elapsed = 0;
+    struct timespec start, end;
+    long elapsed = 0, tv_nsec = 0;
     char c;
 
     int fd1 = open("/dev/rand", O_RDONLY | O_NONBLOCK);
@@ -32,22 +36,17 @@ int main() {
 
     tcsetattr(STDIN_FILENO, TCSANOW, &newSettings);
 
-    clock_gettime(CLOCK_MONOTONIC, &first);
-    clock_gettime(CLOCK_MONOTONIC, &second);
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    fill(&start, &end);
+
     while(1) {
         if (read(STDIN_FILENO, &c, 1) > 0) {
-            if(flag) {
-                clock_gettime(CLOCK_MONOTONIC, &first);
-                // Вычисление времени в наносекундах
-                elapsed = labs((long)(second.tv_nsec - first.tv_nsec));
-            }
-            else {
-                clock_gettime(CLOCK_MONOTONIC, &second);
-                // Вычисление времени в наносекундах
-                elapsed = labs((long)(first.tv_nsec - second.tv_nsec));
-            }
 
-            flag = ~flag;
+            clock_gettime(CLOCK_MONOTONIC, &start);
+            // Вычисление времени в наносекундах
+            elapsed = labs((long)(end.tv_nsec - start.tv_nsec));
+            fill(&start, &end);
+
             if (ioctl(fd1, 1, &elapsed)) {
                 perror("\nОшибка добавления энтропии\n");
                 goto _exit;
