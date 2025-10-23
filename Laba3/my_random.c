@@ -22,6 +22,12 @@ struct node {
     struct node* next;
 };
 
+struct result {
+
+    long value;
+    long seed;
+};
+
 // Структура данных для каждого устройства
 struct rand{
     struct cdev cdev;           // Структура символьного устройства
@@ -45,24 +51,18 @@ static long rand_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
 static ssize_t rand_write(struct file *filp, const char __user *buf, size_t count, loff_t *f_pos){return -ENOSYS;}
 static ssize_t rand_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos){return -ENOSYS;}
 
-static long random_number(struct node *entropy)
+static void random_number(struct result* res, long seed)
 {
-    static long seed = 123;
-    if(!entropy)
-    {
-        goto _exit;
+    static long last_seed = 123;
+    static long last_value = 123;
+
+    if(last_seed != seed) {
+        last_value = last_seed = seed;
     }
 
-    struct node* next = entropy;
-    while(!next)
-    {
-        seed = seed * 1103515245 + next->value;
-        next = next->next;
-    }
-
-_exit:
-    seed = seed * 1103515245 + 12345;
-    return (seed >> 16) & 0x7FFFFFFF;
+    last_value = last_value * 1103515245 + 12345;
+    res->seed = last_seed;
+    res->value = (last_value >> 16) & 0x7FFFFFFF;
 }
 
 // Структура файловых операций - связывает системные вызовы с нашими функциями
@@ -214,9 +214,27 @@ static long rand_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
     switch (cmd) {
     case 0: // Команда для получения рандомного числа
     {
-        long value = random_number(dev->entropy);
-        pr_info("rand: value = %ld\n", value);
-        if (copy_to_user(user_arg, &value, sizeof(long))) {
+        long seed;
+        if(!dev->entropy)
+        {
+            seed = 123;
+            goto _random;
+        }
+
+        struct node* next = dev->entropy;
+        while(next != 0)
+        {
+            pr_info("rand: next = %ld\n", next->value);
+            seed = next->value;
+            next = next->next;
+        }
+_random:
+        struct result value;
+        random_number(&value, seed);
+
+        pr_info("rand: value = %ld\n", value.value);
+
+        if (copy_to_user(user_arg, &value, sizeof(struct result))) {
             retval = -EFAULT;
         }
         break;

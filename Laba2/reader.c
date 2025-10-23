@@ -30,7 +30,7 @@ int main() {
     // Настраиваем адрес сервера
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_addr.s_addr = host("");
     server_addr.sin_port = htons(LISTEN_PORT);
 
     // Привязываем сокет
