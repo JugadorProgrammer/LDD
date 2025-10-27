@@ -7,8 +7,8 @@
 #include <arpa/inet.h>
 
 #define BUFFER_SIZE 1024
-#define DEST_IP "192.168.1.11"  // Адрес eth1
-#define DEST_PORT 8888
+#define DEST_IP "127.0.0.1"  // Адрес eth1
+#define DEST_PORT 8807
 
 int main() {
     int sockfd;
